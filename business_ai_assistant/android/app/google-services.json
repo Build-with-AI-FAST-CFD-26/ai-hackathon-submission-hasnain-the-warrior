@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "861083253187",
+    "project_id": "gdg-business-ai-assistant",
+    "storage_bucket": "gdg-business-ai-assistant.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:861083253187:android:8cc774d01b28a5f58e2576",
+        "android_client_info": {
+          "package_name": "com.business_ai_assistant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDj5wCq2zpgQGjZHdWBpa2PYAtujmsjV64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:861083253187:android:35aeed162264a9018e2576",
+        "android_client_info": {
+          "package_name": "com.example.business_ai_assistant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDj5wCq2zpgQGjZHdWBpa2PYAtujmsjV64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

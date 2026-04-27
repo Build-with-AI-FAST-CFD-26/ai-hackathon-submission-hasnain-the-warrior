@@ -1,21 +1,45 @@
+import 'package:business_ai_assistant/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(const AIAssistantApp());
 }
 
-// Data Model
+// Data Model updated for Firestore
 class Lead {
+  final String id;
   final String name;
   final String message;
 
-  Lead({required this.name, required this.message});
-}
+  Lead({required this.id, required this.name, required this.message});
 
-// Global persistence for the session
-List<Lead> globalLeads = [];
+  // Convert Firestore Document to Lead object
+  factory Lead.fromFirestore(DocumentSnapshot doc) {
+    Map data = doc.data() as Map<String, dynamic>;
+    return Lead(
+      id: doc.id,
+      name: data['name'] ?? '',
+      message: data['message'] ?? '',
+    );
+  }
+
+  // Convert Lead to Map for saving
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'message': message,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+  }
+}
 
 class AIAssistantApp extends StatelessWidget {
   const AIAssistantApp({super.key});
@@ -25,11 +49,7 @@ class AIAssistantApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Founder Stack AI',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blueAccent,
-        brightness: Brightness.light,
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blueAccent),
       home: const HomeScreen(),
     );
   }
@@ -41,11 +61,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Founder Stack AI'),
-        centerTitle: true,
-        elevation: 2,
-      ),
+      appBar: AppBar(title: const Text('Founder Stack AI'), centerTitle: true),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -94,10 +110,10 @@ class HomeScreen extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
-            BoxShadow(
+            const BoxShadow(
               color: Colors.black12,
               blurRadius: 10,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -129,17 +145,20 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
   final TextEditingController _name = TextEditingController();
   final TextEditingController _msg = TextEditingController();
 
-  void _save() {
+  Future<void> _saveToFirestore() async {
     if (_name.text.isNotEmpty && _msg.text.isNotEmpty) {
-      setState(
-        () => globalLeads.add(Lead(name: _name.text, message: _msg.text)),
-      );
+      await FirebaseFirestore.instance.collection('leads').add({
+        'name': _name.text,
+        'message': _msg.text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Lead Stored')));
+      ).showSnackBar(const SnackBar(content: Text('Lead Saved to Firestore')));
       _name.clear();
       _msg.clear();
-      FocusScope.of(context).unfocus();
     }
   }
 
@@ -154,7 +173,7 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
             TextField(
               controller: _name,
               decoration: const InputDecoration(
-                labelText: 'Lead Name',
+                labelText: 'Name',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -163,19 +182,19 @@ class _AddLeadScreenState extends State<AddLeadScreen> {
               controller: _msg,
               maxLines: 4,
               decoration: const InputDecoration(
-                labelText: 'Lead Message/Inquiry',
+                labelText: 'Message',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 30),
             ElevatedButton(
-              onPressed: _save,
+              onPressed: _saveToFirestore,
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 55),
                 backgroundColor: Colors.blueAccent,
                 foregroundColor: Colors.white,
               ),
-              child: const Text('Save Lead Data'),
+              child: const Text('Save Lead'),
             ),
           ],
         ),
@@ -194,18 +213,16 @@ class ViewLeadsScreen extends StatefulWidget {
 class _ViewLeadsScreenState extends State<ViewLeadsScreen> {
   final String apiKey = "YOUR_API_KEY";
 
-  Future<void> _generateFollowUp(String leadName, String leadMsg) async {
+  Future<void> _generateFollowUp(String name, String msg) async {
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (c) => const Center(child: CircularProgressIndicator()),
     );
-
     try {
       final url = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
       );
-      final response = await http.post(
+      final res = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -214,22 +231,16 @@ class _ViewLeadsScreenState extends State<ViewLeadsScreen> {
               "parts": [
                 {
                   "text":
-                      "Write a professional, short, and friendly follow-up email/message for $leadName who said: '$leadMsg'",
+                      "Write a professional follow-up message for $name regarding: '$msg'",
                 },
               ],
             },
           ],
         }),
       );
-
-      Navigator.pop(context); // Close loader
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _showResult(data['candidates'][0]['content']['parts'][0]['text']);
-      } else {
-        _showResult("Error: Unable to connect to Gemini.");
-      }
+      Navigator.pop(context);
+      final data = jsonDecode(res.body);
+      _showResult(data['candidates'][0]['content']['parts'][0]['text']);
     } catch (e) {
       Navigator.pop(context);
       _showResult("Error: $e");
@@ -240,12 +251,12 @@ class _ViewLeadsScreenState extends State<ViewLeadsScreen> {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text("AI Follow-up Draft"),
+        title: const Text("AI Follow-up"),
         content: SingleChildScrollView(child: SelectableText(text)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c),
-            child: const Text("Done"),
+            child: const Text("Close"),
           ),
         ],
       ),
@@ -255,48 +266,47 @@ class _ViewLeadsScreenState extends State<ViewLeadsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('All Leads')),
-      body: globalLeads.isEmpty
-          ? const Center(child: Text('No leads found.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(15),
-              itemCount: globalLeads.length,
-              itemBuilder: (context, i) => Card(
-                margin: const EdgeInsets.only(bottom: 15),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        globalLeads[i].name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        globalLeads[i].message,
-                        style: TextStyle(color: Colors.grey[700]),
-                      ),
-                      const Divider(),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () => _generateFollowUp(
-                            globalLeads[i].name,
-                            globalLeads[i].message,
-                          ),
-                          icon: const Icon(Icons.mail_outline, size: 18),
-                          label: const Text("Generate Follow-up"),
-                        ),
-                      ),
-                    ],
+      appBar: AppBar(title: const Text('All Leads (Real-time)')),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('leads')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data!.docs;
+          if (docs.isEmpty) {
+            return const Center(child: Text("No leads in database."));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(15),
+            itemCount: docs.length,
+            itemBuilder: (context, i) {
+              final lead = Lead.fromFirestore(docs[i]);
+              return Card(
+                child: ListTile(
+                  title: Text(
+                    lead.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(lead.message),
+                  trailing: IconButton(
+                    icon: const Icon(
+                      Icons.mail_outline,
+                      color: Colors.blueAccent,
+                    ),
+                    onPressed: () => _generateFollowUp(lead.name, lead.message),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -310,19 +320,25 @@ class AISuggestionsScreen extends StatefulWidget {
 
 class _AISuggestionsScreenState extends State<AISuggestionsScreen> {
   final String apiKey = "YOUR_API_KEY";
-  String _response = "Analyze all leads to find your top 3 priorities.";
+  String _response = "Click to analyze database and get your plan.";
   bool _loading = false;
 
   Future<void> _fetchPlan() async {
-    if (globalLeads.isEmpty) {
-      setState(() => _response = "Add leads first to generate a plan.");
-      return;
-    }
     setState(() => _loading = true);
     try {
-      final contextString = globalLeads
-          .map((e) => "${e.name}: ${e.message}")
+      // Fetch data from Firestore
+      final snapshot = await FirebaseFirestore.instance
+          .collection('leads')
+          .get();
+      if (snapshot.docs.isEmpty) {
+        setState(() => _response = "No leads found in Firestore.");
+        return;
+      }
+
+      final contextString = snapshot.docs
+          .map((doc) => "${doc['name']}: ${doc['message']}")
           .join(" | ");
+
       final url = Uri.parse(
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
       );
@@ -335,13 +351,14 @@ class _AISuggestionsScreenState extends State<AISuggestionsScreen> {
               "parts": [
                 {
                   "text":
-                      "Based on these startup leads: $contextString. Suggest top 3 priorities and specific follow-up actions for a founder today.",
+                      "Based on these startup leads: $contextString. Suggest top 3 priorities and specific follow-up actions for today.",
                 },
               ],
             },
           ],
         }),
       );
+
       if (res.statusCode == 200) {
         setState(
           () => _response = jsonDecode(
@@ -390,7 +407,7 @@ class _AISuggestionsScreenState extends State<AISuggestionsScreen> {
                 backgroundColor: Colors.indigo,
                 foregroundColor: Colors.white,
               ),
-              child: const Text("What should I do today?"),
+              child: const Text("Analyze Firestore Data"),
             ),
           ],
         ),
