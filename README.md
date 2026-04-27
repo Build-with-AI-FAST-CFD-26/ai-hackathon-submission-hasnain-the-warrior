@@ -1,14 +1,16 @@
 [![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/p4udQv-V)
 # [Enter Your Project Name] - Build with AI Hackathon 2026
-**Team Name:** [Insert from Registration]
-**Team Members:** [Member 1, Member 2, Member 3]
+**Hasnain The Warrior:** [Insert from Registration]
+**Team Members:** [Member 1]
 
 ## 1. Project Overview
 Provide a 2-3 sentence summary of the problem you are solving and your AI-powered solution.
 
 ## 2. Google AI Tech Stack Implementation
 Explain how your team utilized the following mandatory technologies:
-* **Google AI Studio / Vertex AI:** Which models (like Gemini) did you use, and what was the specific implementation?
+* **Google AI Studio :** Which models (like Gemini) did you use, and what was the specific implementation?
+I used the google AI Studio, 
+
 * **Hosting & Backend:** Did you use Google Cloud Run or Firebase Studio for deployment?
 * **Integration:** How does your solution connect these Google tools to solve the problem?
 
